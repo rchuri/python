@@ -1,0 +1,51 @@
+import streamlit as st
+import yfinance as yf
+import numpy as np
+import pandas as pd
+from datetime import datetime
+
+st.title("Stock Portfolio Analyzer")
+
+# Input form
+st.sidebar.header("User Input")
+stocks = st.sidebar.text_input("Enter stock symbols (comma separated)", "AAPL, MSFT, GOOGL")
+start_date = st.sidebar.date_input("Start Date", datetime(2020, 1, 1))
+
+# Process input
+stocks_list = stocks.split(',')
+
+# Fetch stock data
+def fetch_data(symbols, start):
+    data = {}
+    for symbol in symbols:
+        df = yf.download(symbol.strip(), start=start)
+        data[symbol.strip()] = df
+    return data
+
+# Calculate returns and beta
+def calculate_metrics(data):
+    returns = {}
+    beta = {}
+    
+    spy = yf.download('SPY', start=start_date)['Close']
+    
+    for stock, df in data.items():
+        returns[stock] = (df['Close'][-1] - df['Close'][0]) / df['Close'][0]
+        covariance = np.cov(df['Close'].pct_change()[1:], spy.pct_change()[1:])[0][1]
+        market_variance = spy.pct_change().var()
+        beta[stock] = covariance / market_variance
+    
+    portfolio_beta = np.mean(list(beta.values()))
+    return returns, portfolio_beta
+
+# Fetch data and calculate metrics
+if st.sidebar.button("Analyze"):
+    data = fetch_data(stocks_list, start_date)
+    returns, portfolio_beta = calculate_metrics(data)
+    
+    # Display results
+    st.subheader("Returns")
+    st.write(pd.DataFrame.from_dict(returns, orient='index', columns=['Return']))
+
+    st.subheader("Portfolio Beta")
+    st.write(portfolio_beta)
